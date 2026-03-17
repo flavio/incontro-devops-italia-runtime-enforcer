@@ -82,6 +82,21 @@ func natsPolicy(r *demo.Run) {
 	r.Step(demo.S(
 		"Show the policy violation recorded in the WorkloadPolicy status",
 	), demo.S("kubectl get workloadpolicies.security.rancher.io sts-my-nats -o yaml", "|", "bat -l yaml"))
+
+	r.Step(demo.S(
+		"Allow busybox inside the NATS container",
+	), demo.S(
+		"kubectl patch workloadpolicy sts-my-nats --type='json'",
+		`-p='[{"op": "add", "path": "/spec/rulesByContainer/nats/executables/allowed/-", "value": "/bin/busybox"}]'`,
+	))
+
+	r.Step(demo.S(
+		"Guess what has NOT been removed from this image?!",
+	), demo.S("kubectl exec -ti my-nats-0 -c nats -- which apk"))
+
+	r.Step(demo.S(
+		"Install curl, like an attacker would do to download their crypto miner",
+	), demo.S("kubectl exec -ti my-nats-0 -c nats -- apk add curl"))
 }
 
 func cleanupNats() error {
