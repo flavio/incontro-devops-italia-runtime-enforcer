@@ -39,8 +39,8 @@ func natsPolicy(r *demo.Run) {
 	))
 
 	r.Step(demo.S(
-		"Inspect the generated WorkloadPolicyProposal",
-	), demo.S("kubectl get workloadpolicyproposals.security.rancher.io sts-my-nats -o yaml", "|", "bat -l yaml"))
+		"Inspect the spec of the generated WorkloadPolicyProposal",
+	), demo.S("kubectl get workloadpolicyproposals.security.rancher.io sts-my-nats -o yaml", "|", "yq '.spec'", "|", "bat -l yaml"))
 
 	r.Step(demo.S(
 		"Promote the proposal into an active policy",
@@ -54,17 +54,6 @@ func natsPolicy(r *demo.Run) {
 	), demo.S("kubectl get workloadpolicies.security.rancher.io sts-my-nats"))
 
 	r.Step(demo.S(
-		"Switch the WorkloadPolicy to protect mode",
-	), demo.S(
-		"kubectl patch workloadpolicy sts-my-nats --type='merge'",
-		`-p '{"spec":{"mode":"protect"}}'`,
-	))
-
-	r.Step(demo.S(
-		"Verify the WorkloadPolicy is now in protect mode",
-	), demo.S("kubectl get workloadpolicies.security.rancher.io sts-my-nats"))
-
-	r.Step(demo.S(
 		"Associate the policy with the NATS StatefulSet",
 	), demo.S(
 		"kubectl patch statefulset my-nats --type='merge'",
@@ -75,9 +64,28 @@ func natsPolicy(r *demo.Run) {
 		"Watch the NATS pod being rolled out with the policy applied",
 	), demo.S("kubectl rollout status statefulset/my-nats"))
 
+	r.Step(demo.S(
+		"Switch the WorkloadPolicy to protect mode",
+	), demo.S(
+		"kubectl patch workloadpolicy sts-my-nats --type='merge'",
+		`-p '{"spec":{"mode":"protect"}}'`,
+	))
+
+	r.Step(demo.S(
+		"Verify the WorkloadPolicy is now in protect mode",
+	), demo.S("kubectl get workloadpolicies.security.rancher.io sts-my-nats"))
+
 	r.StepCanFail(demo.S(
 		"Attempt to run a command not allowed by the policy",
 	), demo.S("kubectl exec -ti my-nats-0 -c nats -- date"))
+
+	r.Step(demo.S(
+		"Wait for the violation to be scraped and recorded",
+	), demo.S(
+		"kubectl wait workloadpolicies.security.rancher.io sts-my-nats",
+		"--for=jsonpath='{.status.violations}'",
+		"--timeout=5m",
+	))
 
 	r.Step(demo.S(
 		"Show the policy violation recorded in the WorkloadPolicy status",

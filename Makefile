@@ -1,5 +1,5 @@
 .PHONY: demo
-demo:
+demo: install
 	@clear
 	@go run . --nats
 
